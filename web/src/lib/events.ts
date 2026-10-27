@@ -54,6 +54,12 @@ export function formatEvent(topics: unknown[], data: unknown): { kind: string; l
       return { kind, label: "Leash revoked" };
     case "agent":
       return { kind, label: `Root agent rotated to ${short(data)}` };
+    case "rep_gate":
+      return { kind, label: `Reputation gate set · min ${d?.[1]} via ${short(d?.[0])}` };
+    case "wl_root":
+      return { kind, label: "Payee whitelist Merkle root updated" };
+    case "score":
+      return { kind, label: `Reputation score updated for ${short(topics[1])}: ${data}` };
     default:
       return { kind, label: kind };
   }

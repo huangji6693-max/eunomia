@@ -14,8 +14,22 @@
 //! stops a real treasury run by someone else, not a contract written to lie; the app
 //! checks the code it adopts for that. `unregister` lets an owner drop an entry.
 use soroban_sdk::{
-    contract, contractclient, contractimpl, contracttype, symbol_short, Address, Env, Vec,
+    contract, contractclient, contractevent, contractimpl, contracttype, Address, Env, Vec,
 };
+
+#[contractevent(topics = ["regd"], data_format = "single-value")]
+pub struct RegisteredEvent {
+    #[topic]
+    pub owner: Address,
+    pub treasury: Address,
+}
+
+#[contractevent(topics = ["unregd"], data_format = "single-value")]
+pub struct UnregisteredEvent {
+    #[topic]
+    pub owner: Address,
+    pub treasury: Address,
+}
 
 #[contracttype]
 #[derive(Clone)]
@@ -61,8 +75,7 @@ impl TreasuryRegistry {
         if !owned.contains(&treasury) {
             owned.push_back(treasury.clone());
             env.storage().persistent().set(&key, &owned);
-            env.events()
-                .publish((symbol_short!("regd"), owner), treasury);
+            RegisteredEvent { owner, treasury }.publish(&env);
         }
     }
 
@@ -86,8 +99,7 @@ impl TreasuryRegistry {
         } else {
             env.storage().persistent().set(&key, &owned);
         }
-        env.events()
-            .publish((symbol_short!("unregd"), owner), treasury);
+        UnregisteredEvent { owner, treasury }.publish(&env);
     }
 
     /// Every treasury registered by `owner`, oldest → newest (empty when none).
@@ -102,7 +114,7 @@ impl TreasuryRegistry {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::testutils::Address as _;
+    use soroban_sdk::{symbol_short, testutils::Address as _};
 
     /// Stands in for a treasury: answers `get_config` with the admin it was built with.
     #[contract]

@@ -19,9 +19,15 @@
 //! roughly six times apart in value; and a token without a cap is a token the factory
 //! refuses, so a treasury of some unknown asset cannot be created through it.
 use soroban_sdk::{
-    contract, contractclient, contractimpl, contracttype, symbol_short, Address, BytesN,
-    Env, Vec,
+    contract, contractclient, contractevent, contractimpl, contracttype, Address, BytesN, Env, Vec,
 };
+
+#[contractevent(topics = ["created"], data_format = "single-value")]
+pub struct CreatedEvent {
+    #[topic]
+    pub owner: Address,
+    pub treasury: Address,
+}
 
 /// A time-bound, spend-capped agent credential to start the treasury with (the Leash).
 #[contracttype]
@@ -213,8 +219,11 @@ impl TreasuryFactory {
             RegistryClient::new(&env, &registry).register(&s.owner, &treasury);
         }
 
-        env.events()
-            .publish((symbol_short!("created"), s.owner), treasury.clone());
+        CreatedEvent {
+            owner: s.owner,
+            treasury: treasury.clone(),
+        }
+        .publish(&env);
         treasury
     }
 }

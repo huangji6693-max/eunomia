@@ -10,7 +10,25 @@
 //! See OpenZeppelin Confidential Token `compliance::Policy`:
 //!   `fn is_authorized(e, account, token) -> bool`
 
-use soroban_sdk::{contract, contractclient, contractimpl, contracttype, Address, Env};
+use soroban_sdk::{
+    contract, contractclient, contractevent, contractimpl, contracttype, Address, Env,
+};
+
+#[contractevent(topics = ["payee_add"], data_format = "single-value")]
+pub struct PayeeAddEvent {
+    pub payee: Address,
+}
+
+#[contractevent(topics = ["payee_rm"], data_format = "single-value")]
+pub struct PayeeRemoveEvent {
+    pub payee: Address,
+}
+
+#[contractevent(topics = ["rep_gate"], data_format = "vec")]
+pub struct ReputationGateEvent {
+    pub registry: Address,
+    pub min_reputation: i128,
+}
 
 #[contracttype]
 #[derive(Clone)]
@@ -41,13 +59,19 @@ impl EunomiaPolicy {
     /// Whitelist a payee. Admin-only.
     pub fn add_payee(env: Env, payee: Address) {
         Self::admin(&env).require_auth();
-        env.storage().persistent().set(&DataKey::Payee(payee), &true);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Payee(payee.clone()), &true);
+        PayeeAddEvent { payee }.publish(&env);
     }
 
     /// Remove a payee from the whitelist. Admin-only.
     pub fn remove_payee(env: Env, payee: Address) {
         Self::admin(&env).require_auth();
-        env.storage().persistent().remove(&DataKey::Payee(payee));
+        env.storage()
+            .persistent()
+            .remove(&DataKey::Payee(payee.clone()));
+        PayeeRemoveEvent { payee }.publish(&env);
     }
 
     /// Configure the reputation gate. With `min_reputation > 0`, a non-whitelisted
@@ -57,6 +81,11 @@ impl EunomiaPolicy {
         Self::admin(&env).require_auth();
         env.storage().instance().set(&DataKey::RepRegistry, &registry);
         env.storage().instance().set(&DataKey::MinReputation, &min_reputation);
+        ReputationGateEvent {
+            registry,
+            min_reputation,
+        }
+        .publish(&env);
     }
 
     /// Whitelist membership (a view; the full gate is `is_authorized`).

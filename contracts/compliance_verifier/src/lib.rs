@@ -16,12 +16,21 @@
 //! published payee root, and the total it actually moved in that period. The caller must
 //! be that treasury's admin. One verifier serves every treasury.
 use soroban_sdk::{
-    contract, contractclient, contracterror, contractimpl, contracttype,
+    contract, contractclient, contracterror, contractevent, contractimpl, contracttype,
     crypto::bn254::{
         Bn254Fr, Bn254G1Affine, Bn254G2Affine, BN254_G1_SERIALIZED_SIZE, BN254_G2_SERIALIZED_SIZE,
     },
-    panic_with_error, symbol_short, Address, Bytes, BytesN, Env, Vec,
+    panic_with_error, Address, Bytes, BytesN, Env, Vec,
 };
+
+#[contractevent(topics = ["attested"], data_format = "vec")]
+pub struct AttestedEvent {
+    #[topic]
+    pub treasury: Address,
+    pub period: u64,
+    pub spent: i128,
+    pub root: BytesN<32>,
+}
 
 #[cfg(test)]
 mod test;
@@ -409,8 +418,13 @@ impl ComplianceVerifier {
             LAST_PERIOD_TTL_THRESHOLD,
             LAST_PERIOD_TTL_EXTEND_TO,
         );
-        env.events()
-            .publish((symbol_short!("attested"), treasury), (period, spent, root));
+        AttestedEvent {
+            treasury,
+            period,
+            spent,
+            root,
+        }
+        .publish(&env);
     }
 
     /// The last period this treasury attested to, if any.

@@ -52,6 +52,8 @@ export const TREASURY_KINDS = [
   "monthly",
   "payee_cap",
   "budget",
+  "rep_gate",
+  "wl_root",
 ] as const;
 
 const decode = (b64: string): unknown => scValToNative(xdr.ScVal.fromXDR(b64, "base64"));
@@ -103,6 +105,15 @@ export function toEventRow(e: RpcEvent, network: string): EventRow {
       counterparty = e.topic[1] ? str(decode(e.topic[1])) : null;
       amount = str(tuple[1]); // the budget's cap
       break;
+    case "rep_gate":
+      counterparty = str(tuple[0]);
+      amount = str(tuple[1]);
+      break;
+    case "score":
+      counterparty = e.topic[1] ? str(decode(e.topic[1])) : null;
+      amount = str(tuple[0]);
+      break;
+    case "wl_root":
     case "paused":
     case "revoked":
       break;

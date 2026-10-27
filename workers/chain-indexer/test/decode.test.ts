@@ -100,4 +100,27 @@ describe("toEventRow", () => {
       amount: null,
     });
   });
+
+  it("rep_gate, wl_root, and score decode counterparty and amount", () => {
+    const repGateVal = xdr.ScVal.scvVec([addr(TREASURY), i128(75n)]);
+    expect(toEventRow(event([sym("rep_gate")], repGateVal), "mainnet")).toMatchObject({
+      kind: "rep_gate",
+      counterparty: TREASURY,
+      amount: "75",
+    });
+
+    expect(
+      toEventRow(event([sym("wl_root")], xdr.ScVal.scvBytes(Buffer.alloc(32))), "mainnet"),
+    ).toMatchObject({
+      kind: "wl_root",
+      counterparty: null,
+      amount: null,
+    });
+
+    expect(toEventRow(event([sym("score"), b64(addr(OWNER))], i128(90n)), "mainnet")).toMatchObject({
+      kind: "score",
+      counterparty: OWNER,
+      amount: "90",
+    });
+  });
 });

@@ -31,6 +31,9 @@ describe("formatEvent", () => {
     expect(formatEvent(["paused"], false).label).toMatch(/resumed/i);
     expect(formatEvent(["revoked"], null).label).toMatch(/leash/i);
     expect(formatEvent(["agent"], "GAGENTADDR").label).toMatch(/agent/i);
+    expect(formatEvent(["rep_gate"], ["CREGISTRY123456", 70n]).label).toMatch(/Reputation gate set/);
+    expect(formatEvent(["wl_root"], new Uint8Array(32)).label).toMatch(/Merkle root/i);
+    expect(formatEvent(["score", "GAGENT123456"], 85n).label).toMatch(/Reputation score updated/);
   });
 });
 

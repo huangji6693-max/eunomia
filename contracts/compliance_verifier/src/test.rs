@@ -1,7 +1,7 @@
 #![cfg(test)]
 use super::*;
 use soroban_sdk::testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke};
-use soroban_sdk::{contract, contractimpl, Address, Bytes, BytesN, Env, IntoVal};
+use soroban_sdk::{contract, contractimpl, symbol_short, Address, Bytes, BytesN, Env, IntoVal};
 
 // Binary fixtures emitted by packages/prover (one encoder, shared with the live call).
 const PROOF: &[u8] = include_bytes!("../fixtures/proof.bin");

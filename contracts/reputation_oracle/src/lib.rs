@@ -3,7 +3,14 @@
 //! the Eunomia demo controls. Exposes the `reputation_of(agent) -> i128` interface the
 //! treasury's reputation gate reads. In production the score is earned from settled
 //! work (see the Casper trust layer); here the admin sets it for demonstration.
-use soroban_sdk::{contract, contractimpl, contracttype, Address, Env};
+use soroban_sdk::{contract, contractevent, contractimpl, contracttype, Address, Env};
+
+#[contractevent(topics = ["score"], data_format = "single-value")]
+pub struct ScoreSetEvent {
+    #[topic]
+    pub agent: Address,
+    pub score: i128,
+}
 
 #[contracttype]
 #[derive(Clone)]
@@ -25,7 +32,10 @@ impl ReputationOracle {
     pub fn set_score(env: Env, agent: Address, score: i128) {
         let admin: Address = env.storage().instance().get(&DataKey::Admin).unwrap();
         admin.require_auth();
-        env.storage().persistent().set(&DataKey::Score(agent), &score);
+        env.storage()
+            .persistent()
+            .set(&DataKey::Score(agent.clone()), &score);
+        ScoreSetEvent { agent, score }.publish(&env);
     }
 
     pub fn reputation_of(env: Env, agent: Address) -> i128 {
@@ -39,7 +49,10 @@ impl ReputationOracle {
 #[cfg(test)]
 mod test {
     use super::*;
-    use soroban_sdk::{testutils::Address as _, Env};
+    use soroban_sdk::{
+        testutils::{Address as _, Events as _},
+        Env,
+    };
 
     #[test]
     fn set_and_read_score() {
@@ -52,6 +65,7 @@ mod test {
         let agent = Address::generate(&env);
         assert_eq!(client.reputation_of(&agent), 0);
         client.set_score(&agent, &75_i128);
+        assert_eq!(env.events().all().events().len(), 1);
         assert_eq!(client.reputation_of(&agent), 75);
     }
 }

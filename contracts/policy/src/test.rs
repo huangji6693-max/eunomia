@@ -59,3 +59,18 @@ fn reputation_gated_payee_is_authorized() {
     policy.set_reputation_policy(&rep, &0);
     assert!(!policy.is_authorized(&payee, &token));
 }
+
+#[test]
+fn policy_emits_typed_events() {
+    use soroban_sdk::testutils::Events as _;
+    let (env, policy) = setup();
+    let payee = Address::generate(&env);
+    let rep = Address::generate(&env);
+
+    policy.add_payee(&payee);
+    assert_eq!(env.events().all().events().len(), 1);
+    policy.set_reputation_policy(&rep, &70);
+    assert_eq!(env.events().all().events().len(), 1);
+    policy.remove_payee(&payee);
+    assert_eq!(env.events().all().events().len(), 1);
+}

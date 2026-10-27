@@ -13,9 +13,130 @@
 //! budgets: a Leash that may only pay a named set of payees.
 
 use soroban_sdk::{
-    contract, contractclient, contracterror, contractimpl, contracttype, panic_with_error,
-    symbol_short, token, Address, BytesN, Env, Vec,
+    contract, contractclient, contracterror, contractevent, contractimpl, contracttype,
+    panic_with_error, token, Address, BytesN, Env, Vec,
 };
+
+#[contractevent(topics = ["payee_add"], data_format = "single-value")]
+pub struct PayeeAddEvent {
+    pub payee: Address,
+}
+
+#[contractevent(topics = ["payee_rm"], data_format = "single-value")]
+pub struct PayeeRemoveEvent {
+    pub payee: Address,
+}
+
+#[contractevent(topics = ["rep_gate"], data_format = "vec")]
+pub struct ReputationGateEvent {
+    pub registry: Address,
+    pub min_reputation: i128,
+}
+
+#[contractevent(topics = ["wl_root"], data_format = "single-value")]
+pub struct WhitelistRootEvent {
+    pub root: BytesN<32>,
+}
+
+#[contractevent(topics = ["session"], data_format = "vec")]
+pub struct SessionSetEvent {
+    pub agent: Address,
+    pub valid_until: u64,
+    pub limit: i128,
+}
+
+#[contractevent(topics = ["budget"], data_format = "vec")]
+pub struct TaskBudgetEvent {
+    #[topic]
+    pub agent: Address,
+    pub valid_until: u64,
+    pub limit: i128,
+    pub payees: Vec<Address>,
+}
+
+#[contractevent(topics = ["revoked"], data_format = "single-value")]
+pub struct SessionRevokedEvent {}
+
+#[contractevent(topics = ["monthly"], data_format = "single-value")]
+pub struct MonthlyLimitEvent {
+    pub limit: i128,
+}
+
+#[contractevent(topics = ["payee_cap"], data_format = "single-value")]
+pub struct PayeeCapEvent {
+    #[topic]
+    pub payee: Address,
+    pub cap: i128,
+}
+
+#[contractevent(topics = ["deposit"], data_format = "single-value")]
+pub struct DepositEvent {
+    #[topic]
+    pub from: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["paused"], data_format = "single-value")]
+pub struct PausedEvent {
+    pub paused: bool,
+}
+
+#[contractevent(topics = ["withdrawn"], data_format = "vec")]
+pub struct WithdrawnEvent {
+    pub to: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["limits"], data_format = "vec")]
+pub struct LimitsEvent {
+    pub daily_limit: i128,
+    pub per_task_limit: i128,
+}
+
+#[contractevent(topics = ["agent"], data_format = "single-value")]
+pub struct AgentRotatedEvent {
+    pub agent: Address,
+}
+
+#[contractevent(topics = ["paid"], data_format = "vec")]
+pub struct PaidEvent {
+    #[topic]
+    pub task_id: u64,
+    pub to: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["escrowed"], data_format = "vec")]
+pub struct EscrowedEvent {
+    #[topic]
+    pub id: u64,
+    pub payee: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["released"], data_format = "vec")]
+pub struct ReleasedEvent {
+    #[topic]
+    pub id: u64,
+    pub payee: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["refunded"], data_format = "vec")]
+pub struct RefundedEvent {
+    #[topic]
+    pub id: u64,
+    pub payee: Address,
+    pub amount: i128,
+}
+
+#[contractevent(topics = ["cancelled"], data_format = "vec")]
+pub struct CancelledEvent {
+    #[topic]
+    pub id: u64,
+    pub payee: Address,
+    pub amount: i128,
+}
 
 #[contracterror]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -211,7 +332,7 @@ impl Treasury {
         env.storage()
             .persistent()
             .set(&DataKey::Payee(payee.clone()), &true);
-        env.events().publish((symbol_short!("payee_add"),), payee);
+        PayeeAddEvent { payee }.publish(&env);
     }
 
     /// Remove a payee from the whitelist. Admin-only.
@@ -222,7 +343,7 @@ impl Treasury {
         env.storage()
             .persistent()
             .remove(&DataKey::Payee(payee.clone()));
-        env.events().publish((symbol_short!("payee_rm"),), payee);
+        PayeeRemoveEvent { payee }.publish(&env);
     }
 
     /// Set (or update) the reputation gate. Admin-only. With `min_reputation > 0`,
@@ -239,8 +360,11 @@ impl Treasury {
         env.storage()
             .instance()
             .set(&DataKey::MinReputation, &min_reputation);
-        env.events()
-            .publish((symbol_short!("rep_gate"),), (registry, min_reputation));
+        ReputationGateEvent {
+            registry,
+            min_reputation,
+        }
+        .publish(&env);
     }
 
     /// Publish the Merkle root of the payee set that compliance proofs are checked
@@ -256,7 +380,7 @@ impl Treasury {
         cfg.admin.require_auth();
         Self::bump_instance(&env);
         env.storage().instance().set(&DataKey::WhitelistRoot, &root);
-        env.events().publish((symbol_short!("wl_root"),), root);
+        WhitelistRootEvent { root }.publish(&env);
     }
 
     /// The active reputation gate, if any: `(registry, min_reputation)`.
@@ -297,8 +421,12 @@ impl Treasury {
         // A plain Leash may pay any approved payee: whatever a previous task budget named
         // must not silently narrow (or outlive) the new credential.
         env.storage().instance().remove(&DataKey::SessionPayees);
-        env.events()
-            .publish((symbol_short!("session"),), (agent, valid_until, limit));
+        SessionSetEvent {
+            agent,
+            valid_until,
+            limit,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -318,8 +446,13 @@ impl Treasury {
         }
         Self::set_session(env.clone(), agent.clone(), valid_until, limit)?;
         env.storage().instance().set(&DataKey::SessionPayees, &payees);
-        env.events()
-            .publish((symbol_short!("budget"), agent), (valid_until, limit, payees));
+        TaskBudgetEvent {
+            agent,
+            valid_until,
+            limit,
+            payees,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -339,7 +472,7 @@ impl Treasury {
         Self::bump_instance(&env);
         env.storage().instance().remove(&DataKey::Session);
         env.storage().instance().remove(&DataKey::SessionPayees);
-        env.events().publish((symbol_short!("revoked"),), ());
+        SessionRevokedEvent {}.publish(&env);
     }
 
     // ---- v4 limits: calendar month, per payee, deposit cap ---------------------
@@ -355,7 +488,7 @@ impl Treasury {
             return Err(Error::InvalidLimits);
         }
         env.storage().instance().set(&DataKey::MonthlyLimit, &limit);
-        env.events().publish((symbol_short!("monthly"),), limit);
+        MonthlyLimitEvent { limit }.publish(&env);
         Ok(())
     }
 
@@ -380,7 +513,7 @@ impl Treasury {
         } else {
             env.storage().persistent().set(&key, &cap);
         }
-        env.events().publish((symbol_short!("payee_cap"), payee), cap);
+        PayeeCapEvent { payee, cap }.publish(&env);
         Ok(())
     }
 
@@ -436,7 +569,7 @@ impl Treasury {
             env.current_contract_address(),
             &amount,
         );
-        env.events().publish((symbol_short!("deposit"), from), amount);
+        DepositEvent { from, amount }.publish(&env);
         Ok(())
     }
 
@@ -465,7 +598,7 @@ impl Treasury {
         cfg.admin.require_auth();
         Self::bump_instance(&env);
         env.storage().instance().set(&DataKey::Paused, &paused);
-        env.events().publish((symbol_short!("paused"),), paused);
+        PausedEvent { paused }.publish(&env);
     }
 
     pub fn is_paused(env: Env) -> bool {
@@ -493,8 +626,7 @@ impl Treasury {
             &to,
             &amount,
         );
-        env.events()
-            .publish((symbol_short!("withdrawn"),), (to, amount));
+        WithdrawnEvent { to, amount }.publish(&env);
         Ok(())
     }
 
@@ -511,8 +643,11 @@ impl Treasury {
         cfg.daily_limit = daily_limit;
         cfg.per_task_limit = per_task_limit;
         env.storage().instance().set(&DataKey::Config, &cfg);
-        env.events()
-            .publish((symbol_short!("limits"),), (daily_limit, per_task_limit));
+        LimitsEvent {
+            daily_limit,
+            per_task_limit,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -524,7 +659,7 @@ impl Treasury {
         Self::bump_instance(&env);
         cfg.agent = agent.clone();
         env.storage().instance().set(&DataKey::Config, &cfg);
-        env.events().publish((symbol_short!("agent"),), agent);
+        AgentRotatedEvent { agent }.publish(&env);
     }
 
     // ---- spending ------------------------------------------------------------
@@ -589,8 +724,12 @@ impl Treasury {
             &amount,
         );
 
-        env.events()
-            .publish((symbol_short!("paid"), task_id), (to, amount));
+        PaidEvent {
+            task_id,
+            to,
+            amount,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -747,8 +886,7 @@ impl Treasury {
             env.storage().instance().set(&DataKey::Session, &s);
         }
 
-        env.events()
-            .publish((symbol_short!("escrowed"), id), (payee, amount));
+        EscrowedEvent { id, payee, amount }.publish(&env);
         Ok(id)
     }
 
@@ -788,8 +926,12 @@ impl Treasury {
             &escrow.payee,
             &escrow.amount,
         );
-        env.events()
-            .publish((symbol_short!("released"), id), (escrow.payee, escrow.amount));
+        ReleasedEvent {
+            id,
+            payee: escrow.payee,
+            amount: escrow.amount,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -815,8 +957,12 @@ impl Treasury {
             .instance()
             .set(&DataKey::Locked, &(Self::locked(env.clone()) - escrow.amount));
 
-        env.events()
-            .publish((symbol_short!("refunded"), id), (escrow.payee, escrow.amount));
+        RefundedEvent {
+            id,
+            payee: escrow.payee,
+            amount: escrow.amount,
+        }
+        .publish(&env);
         Ok(())
     }
 
@@ -840,8 +986,12 @@ impl Treasury {
             .instance()
             .set(&DataKey::Locked, &(Self::locked(env.clone()) - escrow.amount));
 
-        env.events()
-            .publish((symbol_short!("cancelled"), id), (escrow.payee, escrow.amount));
+        CancelledEvent {
+            id,
+            payee: escrow.payee,
+            amount: escrow.amount,
+        }
+        .publish(&env);
         Ok(())
     }
 
