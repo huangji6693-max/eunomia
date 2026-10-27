@@ -8,7 +8,7 @@ import { callService } from "./call.js";
 import { searchServices } from "./catalog.js";
 import { isValidContractId } from "./credential.js";
 import { errText } from "./errors.js";
-import { fundFloat, sweepFloat, tokenBalance } from "./float.js";
+import { addTrustline, fundFloat, sweepFloat, tokenBalance } from "./float.js";
 import { fromStroops, toStroops, txUrl } from "./format.js";
 import { TRUSTLINE_MISSING } from "./pay.js";
 import type { ServerContext } from "./server.js";
@@ -83,11 +83,40 @@ export function registerSpendTools(server: McpServer, ctx: ServerContext): void 
         const unit = await treasuryUnit(ctx.net, ctx.treasuryId!);
         const out: Record<string, unknown> = serializeOutcome(outcome, ctx.net.name, unit);
         if (!outcome.paid && outcome.reasons.some((r) => r.code === TRUSTLINE_MISSING)) {
-          out.nextStep = `The agent account cannot hold ${unit ?? "the treasury's token"} yet — run \`eunomia-mcp trustline\` once, then fund again.`;
+          out.nextStep = `The agent account cannot hold ${unit ?? "the treasury's token"} yet — call prepare_float (or run \`eunomia-mcp trustline\`) once, then fund again.`;
         }
         return ok({ float: true, ...out });
       } catch (e) {
         return fail(`fund_float failed: ${errText(e)}`);
+      }
+    },
+  );
+
+  server.registerTool(
+    "prepare_float",
+    {
+      title: "Prepare the task float",
+      description:
+        "Let this agent's Stellar account hold the treasury's token (a classic trustline for issued assets such as USDC; a no-op for native XLM or when the trustline is already present). Signed by the agent's key; the agent account must already hold XLM for the base reserve. Call once before the first fund_float on an issued-asset treasury.",
+      inputSchema: {},
+    },
+    async () => {
+      const notReady = ready(ctx);
+      if (notReady) return fail(notReady);
+      try {
+        const r = await addTrustline(ctx);
+        return ok({
+          agentPublicKey: ctx.credential!.agentPublicKey,
+          asset: r.asset,
+          status: r.status,
+          ...(r.txHash ? { txHash: r.txHash, links: { tx: txUrl(ctx.net.name, r.txHash) } } : {}),
+          nextStep:
+            r.status === "FAILED"
+              ? "Ensure the agent account holds ~3 XLM for reserves and fees, then call prepare_float again."
+              : "Call fund_float to move funds from the treasury into the agent's float.",
+        });
+      } catch (e) {
+        return fail(`prepare_float failed: ${errText(e)}`);
       }
     },
   );

@@ -335,3 +335,54 @@ test("call_service refuses a private target before any request is made", async (
   );
   assert.equal(called, false);
 });
+
+// ---- prepare_float / addTrustline ----------------------------------------------------
+
+test("addTrustline skips native XLM and already-established trustlines, and submits changeTrust when missing", async () => {
+  const { Asset } = await import("@stellar/stellar-sdk");
+  const { addTrustline } = await import("./float.js");
+  const usdc = new Asset("USDC", "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN");
+
+  // 1. Native XLM needs no trustline.
+  const nativeRes = await addTrustline(ctx(), {
+    readToken: async () => TOKEN,
+    readAsset: async () => Asset.native(),
+  });
+  assert.deepEqual(nativeRes, { asset: "XLM", txHash: null, status: "NOT_NEEDED" });
+
+  // 2. Issued asset where trustline already exists is a no-op.
+  const existingRes = await addTrustline(ctx(), {
+    readToken: async () => TOKEN,
+    readAsset: async () => usdc,
+    checkLacksTrustline: async () => false,
+  });
+  assert.deepEqual(existingRes, {
+    asset: "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+    txHash: null,
+    status: "NOT_NEEDED",
+  });
+
+  // 3. Issued asset lacking trustline submits changeTrust signed by the agent.
+  let submittedOps = 0;
+  const createdRes = await addTrustline(ctx(), {
+    readToken: async () => TOKEN,
+    readAsset: async () => usdc,
+    checkLacksTrustline: async () => true,
+    submit: async (_net, _kp, ops) => {
+      submittedOps = ops.length;
+      return { txHash: "dd".repeat(32), ledger: 123, status: "SUCCESS" as const };
+    },
+  });
+  assert.equal(submittedOps, 1);
+  assert.deepEqual(createdRes, {
+    asset: "USDC:GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
+    txHash: "dd".repeat(32),
+    status: "SUCCESS",
+  });
+});
+
+test("createServer registers the prepare_float MCP tool", async () => {
+  const { createServer } = await import("./server.js");
+  const srv = createServer(ctx()) as unknown as { _registeredTools?: Record<string, unknown> };
+  assert.ok(srv._registeredTools && "prepare_float" in srv._registeredTools);
+});

@@ -15,6 +15,7 @@ export * from "./pay.js";
 export * from "./onchain.js";
 export * from "./exceptionCodec.js";
 export * from "./exception.js";
+export * from "./float.js";
 export * from "./store.js";
 export { serializeBudget, serializeOutcome, ownerActionsFor, registerTools } from "./tools.js";
 export { createServer, contextFromEnv, SERVER_NAME, SERVER_VERSION } from "./server.js";

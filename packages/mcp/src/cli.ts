@@ -20,8 +20,9 @@ const USAGE = `eunomia-mcp ${SERVER_VERSION} — connect an AI agent to a Eunomi
 
 usage:
   eunomia-mcp [serve]                       run the MCP server on stdio (what Claude spawns)
-  eunomia-mcp init --treasury <C…> [--client claude-desktop|cursor|claude-code] [--force]
-                                            create this agent's credential, print the key the owner authorises,
+  eunomia-mcp init --treasury <C…> [--client claude-desktop|cursor|claude-code] [--no-trustline] [--force]
+                                            create this agent's credential, set up its token trustline when funded
+                                            (unless --no-trustline), print the key the owner authorises,
                                             and with --client add the server to that client's config
   eunomia-mcp trustline [--treasury <C…>]   let the agent's account hold the treasury's token (USDC;
                                             once, before the first fund_float)
@@ -50,6 +51,7 @@ const { values: opts, positionals } = parseArgs({
     amount: { type: "string" },
     task: { type: "string" },
     "record-rejection": { type: "boolean", default: false },
+    "no-trustline": { type: "boolean", default: false },
     force: { type: "boolean", default: false },
     help: { type: "boolean", short: "h", default: false },
   },
@@ -118,20 +120,34 @@ async function init(): Promise<void> {
   const path = saveCredential(home, cred, { force: opts.force });
   console.log(`Credential saved: ${path}`);
   console.log(`Agent public key: ${cred.agentPublicKey}   (not funded yet — see below)`);
+
+  let fundingStep = FUNDING;
+  if (!opts["no-trustline"] && env.EUNOMIA_RPC_URL?.trim()) {
+    try {
+      const r = await addTrustline(contextFromEnv(env));
+      if (r.status === "SUCCESS" || r.status === "NOT_NEEDED") {
+        const link = r.txHash ? ` (${txUrl(net.name, r.txHash)})` : "";
+        fundingStep = `Trustline ready for ${r.asset}${link}.\n\n`;
+      }
+    } catch {
+      // Freshly generated or unfunded account: keep the manual funding + trustline prompt.
+    }
+  }
+
   console.log(`
 Next, the treasury OWNER authorises this key (the secret stays on this machine):
   Eunomia dashboard → your treasury → Agent → paste the public key above, set a cap
   and a duration → Authorise agent (signed with the owner's passkey or wallet).
   Revoke it from the same page at any time.
 
-${FUNDING}${clientStep(env)}
+${fundingStep}${clientStep(env)}
 
 Check it: eunomia-mcp status --treasury ${treasury}
 `);
 }
 
 const FUNDING = `The agent's account needs XLM before it can do anything: send it ~3 XLM (account
-reserve, the token trustline and fees), then run: eunomia-mcp trustline
+reserve, the token trustline and fees), then run: eunomia-mcp trustline (or call prepare_float)
 
 `;
 

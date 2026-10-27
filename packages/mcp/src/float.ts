@@ -108,23 +108,31 @@ export async function sweepFloat(
   };
 }
 
+export interface TrustlineDeps {
+  server?: rpc.Server;
+  readToken?: (ctx: ServerContext) => Promise<string>;
+  readAsset?: typeof readTokenAsset;
+  checkLacksTrustline?: typeof lacksTrustline;
+  submit?: typeof submitClassic;
+}
+
 /** Let the agent's account hold the treasury's token: a classic trustline, needed once on
  *  mainnet before a USDC float can be funded (a G… account holds an issued asset only once
  *  it trusts the issuer). Signed by the agent; the account must already hold XLM for the
  *  reserve. Nothing to do for the native asset. */
 export async function addTrustline(
   ctx: ServerContext,
-  deps: { server?: rpc.Server } = {},
+  deps: TrustlineDeps = {},
 ): Promise<{ asset: string; txHash: string | null; status: "SUCCESS" | "FAILED" | "NOT_NEEDED" }> {
   if (!ctx.credential) throw new Error("No agent credential — run `eunomia-mcp init` first.");
   const server = deps.server ?? new rpc.Server(ctx.net.rpcUrl);
-  const token = await treasuryToken(ctx);
-  const asset = await readTokenAsset(ctx.net, token, server);
+  const token = await (deps.readToken ?? treasuryToken)(ctx);
+  const asset = await (deps.readAsset ?? readTokenAsset)(ctx.net, token, server);
   if (!asset || asset.isNative()) return { asset: asset ? "XLM" : token, txHash: null, status: "NOT_NEEDED" };
   const kp = agentKeypair(ctx.credential);
-  if (!(await lacksTrustline(ctx.net, token, kp.publicKey(), server))) {
+  if (!(await (deps.checkLacksTrustline ?? lacksTrustline)(ctx.net, token, kp.publicKey(), server))) {
     return { asset: `${asset.getCode()}:${asset.getIssuer()}`, txHash: null, status: "NOT_NEEDED" };
   }
-  const r = await submitClassic(ctx.net, kp, [Operation.changeTrust({ asset })], { server });
+  const r = await (deps.submit ?? submitClassic)(ctx.net, kp, [Operation.changeTrust({ asset })], { server });
   return { asset: `${asset.getCode()}:${asset.getIssuer()}`, txHash: r.txHash, status: r.status };
 }
