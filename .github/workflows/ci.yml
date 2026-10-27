@@ -120,3 +120,6 @@ jobs:
           npm install
           npm test
           npm run build
+      - name: clawhub-skill — manifest & tool coverage tests
+        working-directory: packages/clawhub-skill
+        run: npm test

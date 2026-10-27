@@ -1,0 +1,49 @@
+{
+  "name": "eunomia-treasury",
+  "slug": "eunomia-treasury",
+  "version": "0.3.0",
+  "summary": "Pick up and spend from a bounded Eunomia treasury on Stellar mainnet via eunomia-mcp — on-chain policy enforcement, x402/MPP paid API float, signed task-budget links, and on-chain exception requests.",
+  "homepage": "https://eunomia.finance",
+  "license": "Apache-2.0",
+  "repository": "https://github.com/eunomia-finance/eunomia",
+  "directory": "packages/clawhub-skill",
+  "skillFile": "SKILL.md",
+  "tags": [
+    "stellar",
+    "soroban",
+    "treasury",
+    "x402",
+    "mpp",
+    "agent-payments",
+    "mcp",
+    "openclaw",
+    "clawhub"
+  ],
+  "env": [
+    {
+      "name": "EUNOMIA_TREASURY",
+      "required": true,
+      "description": "56-character Stellar mainnet treasury contract address (C…)"
+    },
+    {
+      "name": "EUNOMIA_RPC_URL",
+      "required": true,
+      "description": "HTTPS Stellar mainnet Soroban RPC endpoint"
+    },
+    {
+      "name": "EUNOMIA_HOME",
+      "required": false,
+      "description": "Directory for local Leash credentials and payee cache (defaults to ~/.eunomia)"
+    }
+  ],
+  "mcpServer": {
+    "name": "eunomia",
+    "package": "eunomia-mcp",
+    "version": "^0.3.0",
+    "command": "npx",
+    "args": [
+      "-y",
+      "eunomia-mcp"
+    ]
+  }
+}

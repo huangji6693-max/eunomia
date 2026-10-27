@@ -52,7 +52,7 @@ Real money, bounded twice: by the owner's rules, and by a deposit cap on every t
 - [ ] **A production SEP-6 anchor** — TRY in and out with real bank rails and real KYC. The client was proven against a sandbox; the counterparty is the work. With **SEP-45** on the anchor's side, so a smart wallet signs in itself
 - [ ] **x402 at scale** — the bounded buyer and `eunomia-mcp`'s `pay` settle x402 requirements today; next is the service side: paying real, USDC-priced agent-facing APIs from a treasury, and a directory of them
 - [ ] **The agent's refusals in the owner's ledger** — payments made through `eunomia-mcp` already appear in the decision ledger (read from the treasury's own events); refusals met in simulation leave no trace on chain, so they need their own path, beside the exception requests
-- [ ] **Agent-platform skills** (OpenClaw / ClawHub) — packaged on top of `eunomia-mcp`, so agents on those platforms pick a treasury up conversationally
+- [x] **Agent-platform skills** (OpenClaw / ClawHub) — packaged on top of `eunomia-mcp` (`packages/clawhub-skill/`), so agents on those platforms pick a treasury up conversationally
 - [ ] ZK compliance wired into the payment flow (confidential-by-default option), composing with OpenZeppelin Confidential Tokens via `ComplianceHooks`
 - [ ] More on-ramps: the same SEP-6 client against anchors in other currencies
 

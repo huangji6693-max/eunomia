@@ -1,0 +1,17 @@
+{
+  "name": "@eunomia/clawhub-skill",
+  "version": "0.3.0",
+  "private": true,
+  "description": "OpenClaw / ClawHub agent skill package built on top of eunomia-mcp for conversational Stellar treasury pickup and bounded spending.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "files": [
+    "SKILL.md",
+    "clawhub.json",
+    "README.md",
+    "demo/conversational-session.md"
+  ],
+  "scripts": {
+    "test": "node --test test/skill.test.mjs"
+  }
+}
